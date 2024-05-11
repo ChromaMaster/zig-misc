@@ -2,9 +2,14 @@ const std = @import("std");
 const http = std.http;
 
 pub const Response = struct {
-    status: u16,
+    client: *const Client,
 
+    status: u16,
     body: []u8 = undefined,
+
+    pub fn deinit(self: *const Response) void {
+        self.client.allocator.free(self.body);
+    }
 };
 
 pub const Client = struct {
@@ -36,13 +41,13 @@ pub const Client = struct {
         try req.finish();
         try req.wait();
 
-        // req.ReadAll()
-
         var response = Response{
+            .client = self,
             .status = @intFromEnum(req.response.status),
         };
 
         response.body = try self.allocator.alloc(u8, @as(usize, req.response.content_length.?));
+        errdefer response.deinit();
 
         _ = try req.read(response.body);
 
